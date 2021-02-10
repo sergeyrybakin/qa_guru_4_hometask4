@@ -2,44 +2,37 @@ package tests;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
 import java.util.Locale;
-import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
 import com.codeborne.selenide.Condition;
 import com.codeborne.selenide.ElementsCollection;
 import com.codeborne.selenide.SelenideElement;
+import com.github.javafaker.Faker;
 
 import static com.codeborne.selenide.Condition.appear;
 import static com.codeborne.selenide.Condition.text;
-import static com.codeborne.selenide.Selectors.byText;
-import static com.codeborne.selenide.Selectors.byValue;
 import static com.codeborne.selenide.Selenide.*;
 
-public class StudentRegistrationFormTest
-{
+public class StudentRegistrationFormTest {
 
     @Test
-    void dataAppearsInModalPopUpWindow()
-    {
-        String firstName = "Michail";
-        String lastName = "theBear";
-        String email = "m.thebear@mail.ru";
-        String gender = "Male";
-        String phone = "1234567890";
-        String dateOfBirth = "9 Dec 1961";
-        Map<String, String> subject = new HashMap<>();
-        subject.put("a", "Maths");
-        subject.put("c", "Computer Science");
-        subject.put("e", "English");
+    void dataAppearsInModalPopUpWindow() {
+        Faker faker = new Faker();
 
-        String photoFileName = "1518521058110646316.jpg";
-        String[] stringArray = new String[] { "Reading", "Music" };
-        String address = "Forrest str, 5, 534533";
-        String state = "Haryana";
-        String city = "Panipat";
+        String firstName = faker.name().firstName();
+        String lastName = faker.name().lastName();
+        String email = firstName.toLowerCase() + "." + faker.letterify("??????").toLowerCase() + faker.numerify("###") + "." + "@gmail.com";
+        int gender = faker.number().numberBetween(1, 2);
+        String phone =  faker.numerify("##########");
+        String dateOfBirth = String.valueOf(faker.date().birthday(18, 60));
+        int subject1 = faker.number().numberBetween(0, 4);
+        int subject2 = faker.number().numberBetween(0, 4);
+        int hobbyNumber = faker.number().numberBetween(1, 3);
+        String address = faker.address().fullAddress();
+        int stateNumber = faker.number().numberBetween(0, 3);
+        String photoFileName = (gender>1 ? "award1_700.jpg" : "1518521058110646316.jpg");
 
         open("https://demoqa.com/automation-practice-form");
         $(".main-header").shouldHave(text("Practice Form")).should(Condition.appear);
@@ -47,22 +40,21 @@ public class StudentRegistrationFormTest
         $("#firstName").setValue(firstName);
         $("#lastName").setValue(lastName);
         $("#userEmail").setValue(email);
-        $(byValue(gender)).sendKeys("/t ");
+        String selectedGender = selectGender(gender);
         $("#userNumber").setValue(phone);
         //Date of Birth
         String formattedDateOfBirth = formatDateOfBirth(dateOfBirth);
         typeDateOfBirth(formattedDateOfBirth);
         //Subject
-        selectSubjects(subject);
+        String selectedSubject = selectSubject(subject1, subject2);
         //Hobby
-        selectHobby(stringArray);
+        String selectedHobby = selectHobby(hobbyNumber);
 
-        $("#uploadPicture").uploadFromClasspath(photoFileName);
+        $("#uploadPicture").uploadFromClasspath("img/" + photoFileName);
 
         //Address
         $("#currentAddress").scrollTo().setValue(address);
-        selectInDropDownList("state", state);
-        selectInDropDownList("city", city);
+        String selectedStateAndCity = selectRandomItemInDropDownList(stateNumber);
 
         //Submit form
         $("#submit").scrollTo().click();
@@ -72,50 +64,57 @@ public class StudentRegistrationFormTest
         ElementsCollection form = $$(".modal-body tr");
         form.filterBy(text("Student Name")).last().shouldHave(text(firstName + " " + lastName));
         form.filterBy(text("Student Email")).last().shouldHave(text(email));
-        form.filterBy(text("Gender")).last().shouldHave(text(gender));
+        form.filterBy(text("Gender")).last().shouldHave(text(selectedGender));
         form.filterBy(text("Mobile")).last().shouldHave(text(phone));
         form.filterBy(text("Date of Birth")).last().shouldHave(text(getHindiDate(formattedDateOfBirth)));
-        subject.forEach((k, v) ->
-                form.filterBy(text("Subjects")).last().shouldHave(text(v))
-        );
-        for (String s : stringArray)
-            form.filterBy(text("Hobbies")).last().shouldHave(text(s));
-        form.filterBy(text("Picture")).last().shouldHave(text(photoFileName));
+        form.filterBy(text("Subjects")).last().shouldHave(text(selectedSubject));
+        form.filterBy(text("Hobbies")).last().shouldHave(text(selectedHobby));
         form.filterBy(text("Address")).last().shouldHave(text(address));
-        form.filterBy(text("State and City")).last().shouldHave(text(state + " " + city));
+        form.filterBy(text("State and City")).last().shouldHave(text(selectedStateAndCity));
+        form.filterBy(text("Picture")).last().shouldHave(text(photoFileName));
 
         $("#closeLargeModal").scrollTo().click();
     }
 
-    private void selectHobby(String[] stringArray)
-    {
-        for (String s : stringArray)
+    private String selectGender(int gender) {
+        $("#gender-radio-" + gender).sendKeys("/t ");
+        return $("#gender-radio-" + gender).getValue();
+    }
+
+    private String selectHobby(int i) {
+        String locator = "[for='hobbies-checkbox-" + i + "']";
+        $(locator).click();
+        String s = $(locator).getText();
+        if (i>1)
         {
-            $("#hobbiesWrapper").findElement(byText(s)).click();
+            String fl = "[for='hobbies-checkbox-1']";
+            $(fl).click();
+            s = s + ", " + $(fl).getText();
         }
-    }
-
-    private void selectSubjects(Map<String, String> subject)
-    {
-        subject.forEach((k, v) -> {
-            $("#subjectsInput").setValue(k);
-            $(".subjects-auto-complete__menu-list").should(appear);
-            $(".subjects-auto-complete__menu-list").findElement(byText(v)).click();
-        });
-    }
-
-    private String formatDateOfBirth(String dateOfBirth)
-    {
-        String s;
-        if (dateOfBirth.indexOf(' ') == 1)
-            s = "0" + dateOfBirth;
-        else
-            s = dateOfBirth;
         return s;
     }
 
-    private void typeDateOfBirth(String dateOfBirth)
-    {
+    private String selectSubject(int n1, int n2) {
+        String c = "abcde";
+        String c2 = "jhilo";
+
+        $("#subjectsInput").setValue(String.valueOf(c.charAt(n1)));
+        $(".subjects-auto-complete__menu-list").should(appear);
+        $$(".subjects-auto-complete__menu-list").get(0).click();
+        String s = $(".subjects-auto-complete__multi-value__label").getText();
+
+        $("#subjectsInput").setValue(String.valueOf(c2.charAt(n2)));
+        $(".subjects-auto-complete__menu-list").should(appear);
+        $$(".subjects-auto-complete__menu-list").last().click();
+        return s + ", " + $$(".subjects-auto-complete__multi-value__label").last().getText();
+    }
+
+    private String formatDateOfBirth(String dateOfBirth) {
+        //Sat Oct 22 03:16:45 NOVT 1977   -> 22 Oct 1977
+        return dateOfBirth.substring(8,10) + " " + dateOfBirth.substring(4,7) + " " + dateOfBirth.substring(dateOfBirth.length()-4);
+    }
+
+    private void typeDateOfBirth(String dateOfBirth) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH);
         LocalDate dateTime = LocalDate.parse(dateOfBirth, formatter);
         int month = dateTime.getMonth().getValue() - 1;
@@ -128,16 +127,24 @@ public class StudentRegistrationFormTest
                 .click();
     }
 
-    private void selectInDropDownList(String type, String name)
-    {
-        SelenideElement selectState = $("#" + type + " div[class $= '-placeholder']");
+    private String selectRandomItemInDropDownList(int stateNumber) {
+        SelenideElement selectState = $("#state div[class $= '-placeholder']");
         selectState.scrollTo().click();
-        SelenideElement dropDownStateList = $("div[class $= '-menu']").should(appear);
-        dropDownStateList.findElement(byText(name)).click();
+        $("div[class $= '-menu']").should(appear);
+        int amount = $$("div[class $= '-menu'] div div").size() - 1;
+        if(amount <= stateNumber)
+            $("#react-select-3-option-" + amount).click();
+        else
+            $("#react-select-3-option-" + stateNumber).click();
+
+        SelenideElement selectCity = $("#city div[class $= '-placeholder']");
+        selectCity.scrollTo().click();
+        $("div[class $= '-menu']").should(appear);
+        $$("div[class $= '-menu'] div div").last().click();
+        return $("#state [class $= '-singleValue']").getText() + " " + $("#city [class $= '-singleValue']").getText();
     }
 
-    private String getHindiDate(String dateOfBirth)
-    {
+    private String getHindiDate(String dateOfBirth) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH);
         LocalDate dateTime = LocalDate.parse(dateOfBirth, formatter);
         DateTimeFormatter formatterOutput = DateTimeFormatter.ofPattern("dd MMMM,yyyy", Locale.ENGLISH);
